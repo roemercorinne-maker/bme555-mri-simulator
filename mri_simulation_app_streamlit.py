@@ -300,43 +300,83 @@ def simple_kspace_reconstruction(image: np.ndarray) -> Tuple[np.ndarray, np.ndar
 # Sidebar controls
 # -----------------------------
 st.title("Interactive MRI Theory Simulation and Monitoring Platform")
-st.caption("A teaching prototype for MRI signal formation, physiology, artifacts, monitoring, and acquisition tradeoffs.")
+st.caption("An interactive platform for exploring MRI physics, physiological effects, image artifacts, and acquisition tradeoffs in real time.")
+
+with st.expander("Why this app matters", expanded=True):
+    st.markdown(
+        """
+This simulator connects **MRI theory** with **real-time monitoring concepts** inspired by industrial analytics platforms such as Seeq.
+Users can change scan settings, patient physiology, and environment conditions, then immediately observe how signal, scan time,
+artifacts, and image behavior respond.
+        """
+    )
+
+DEMO_SCENARIOS = {
+    "Custom": None,
+    "T1 vs T2 Weighting": {
+        "patient_name": "Healthy Adult", "tissue_name": "Gray Matter", "sequence_name": "Spin Echo", "field_strength_t": 3.0,
+        "tr_ms": 500, "te_ms": 20, "flip_angle_deg": 90, "ti_ms": 1800, "ny": 128, "nz": 1, "nsa": 1,
+        "fov_cm": 22.0, "anatomy_width_cm": 24.0, "bandwidth_khz": 40.0, "venc_cm_s": 40, "field_inhomogeneity": 0.15,
+        "heart_rate": 72, "resp_rate": 14, "spo2": 99, "motion_level": 0.08, "flow_cm_s": 25, "fmri_mode": False
+    },
+    "Motion Artifact": {
+        "patient_name": "Anxious Patient", "tissue_name": "Gray Matter", "sequence_name": "EPI", "field_strength_t": 3.0,
+        "tr_ms": 1500, "te_ms": 45, "flip_angle_deg": 75, "ti_ms": 1800, "ny": 128, "nz": 1, "nsa": 1,
+        "fov_cm": 22.0, "anatomy_width_cm": 24.0, "bandwidth_khz": 50.0, "venc_cm_s": 40, "field_inhomogeneity": 0.35,
+        "heart_rate": 105, "resp_rate": 22, "spo2": 98, "motion_level": 0.45, "flow_cm_s": 28, "fmri_mode": False
+    },
+    "Aliasing from Small FOV": {
+        "patient_name": "Healthy Adult", "tissue_name": "Fat", "sequence_name": "Spin Echo", "field_strength_t": 1.5,
+        "tr_ms": 900, "te_ms": 18, "flip_angle_deg": 90, "ti_ms": 1800, "ny": 96, "nz": 1, "nsa": 1,
+        "fov_cm": 14.0, "anatomy_width_cm": 26.0, "bandwidth_khz": 20.0, "venc_cm_s": 40, "field_inhomogeneity": 0.12,
+        "heart_rate": 72, "resp_rate": 14, "spo2": 99, "motion_level": 0.05, "flow_cm_s": 20, "fmri_mode": False
+    },
+    "fMRI Activation": {
+        "patient_name": "Healthy Adult", "tissue_name": "Gray Matter", "sequence_name": "EPI", "field_strength_t": 3.0,
+        "tr_ms": 2000, "te_ms": 32, "flip_angle_deg": 75, "ti_ms": 1800, "ny": 64, "nz": 1, "nsa": 1,
+        "fov_cm": 22.0, "anatomy_width_cm": 22.0, "bandwidth_khz": 55.0, "venc_cm_s": 40, "field_inhomogeneity": 0.25,
+        "heart_rate": 70, "resp_rate": 13, "spo2": 99, "motion_level": 0.06, "flow_cm_s": 24, "fmri_mode": True
+    },
+}
 
 with st.sidebar:
     st.header("Scenario Setup")
-    patient_name = st.selectbox("Patient profile", list(PATIENTS.keys()))
-    tissue_name = st.selectbox("Primary tissue", list(TISSUES.keys()), index=1)
-    sequence_name = st.selectbox("Sequence", list(SEQUENCE_INFO.keys()))
-    field_strength_t = st.selectbox("Field strength (T)", [1.5, 3.0, 7.0], index=1)
+    demo_name = st.selectbox("Demo mode", list(DEMO_SCENARIOS.keys()))
+    demo_values = DEMO_SCENARIOS[demo_name] or {}
+
+    patient_name = st.selectbox("Patient profile", list(PATIENTS.keys()), index=list(PATIENTS.keys()).index(demo_values.get("patient_name", "Healthy Adult")))
+    tissue_name = st.selectbox("Primary tissue", list(TISSUES.keys()), index=list(TISSUES.keys()).index(demo_values.get("tissue_name", "Gray Matter")))
+    sequence_name = st.selectbox("Sequence", list(SEQUENCE_INFO.keys()), index=list(SEQUENCE_INFO.keys()).index(demo_values.get("sequence_name", "Spin Echo")))
+    field_strength_t = st.selectbox("Field strength (T)", [1.5, 3.0, 7.0], index=[1.5, 3.0, 7.0].index(demo_values.get("field_strength_t", 3.0)))
 
     st.header("Acquisition Parameters")
-    tr_ms = st.slider("TR (ms)", 100, 8000, 1200, step=10)
-    te_ms = st.slider("TE (ms)", 5, 300, 35, step=1)
-    flip_angle_deg = st.slider("Flip angle (deg)", 1, 180, 90, step=1)
-    ti_ms = st.slider("TI (ms) [for inversion recovery]", 50, 4000, 1800, step=10)
-    ny = st.slider("Phase-encoding steps (Ny)", 32, 512, 128, step=16)
-    nz = st.slider("3D phase steps (Nz)", 1, 128, 1, step=1)
-    nsa = st.slider("Number of averages (NSA)", 1, 8, 1, step=1)
+    tr_ms = st.slider("TR (ms)", 100, 8000, int(demo_values.get("tr_ms", 1200)), step=10)
+    te_ms = st.slider("TE (ms)", 5, 300, int(demo_values.get("te_ms", 35)), step=1)
+    flip_angle_deg = st.slider("Flip angle (deg)", 1, 180, int(demo_values.get("flip_angle_deg", 90)), step=1)
+    ti_ms = st.slider("TI (ms) [for inversion recovery]", 50, 4000, int(demo_values.get("ti_ms", 1800)), step=10)
+    ny = st.slider("Phase-encoding steps (Ny)", 32, 512, int(demo_values.get("ny", 128)), step=16)
+    nz = st.slider("3D phase steps (Nz)", 1, 128, int(demo_values.get("nz", 1)), step=1)
+    nsa = st.slider("Number of averages (NSA)", 1, 8, int(demo_values.get("nsa", 1)), step=1)
 
     st.header("FOV / Bandwidth / Flow")
-    fov_cm = st.slider("Field of view (cm)", 10.0, 40.0, 22.0, step=0.5)
-    anatomy_width_cm = st.slider("Patient/anatomy width in phase direction (cm)", 10.0, 50.0, 24.0, step=0.5)
-    bandwidth_khz = st.slider("Receiver bandwidth (kHz)", 5.0, 125.0, 40.0, step=1.0)
-    venc_cm_s = st.slider("VENC (cm/s)", 5, 200, 40, step=1)
-    field_inhomogeneity = st.slider("Field inhomogeneity", 0.0, 1.0, 0.2, step=0.01)
+    fov_cm = st.slider("Field of view (cm)", 10.0, 40.0, float(demo_values.get("fov_cm", 22.0)), step=0.5)
+    anatomy_width_cm = st.slider("Patient/anatomy width in phase direction (cm)", 10.0, 50.0, float(demo_values.get("anatomy_width_cm", 24.0)), step=0.5)
+    bandwidth_khz = st.slider("Receiver bandwidth (kHz)", 5.0, 125.0, float(demo_values.get("bandwidth_khz", 40.0)), step=1.0)
+    venc_cm_s = st.slider("VENC (cm/s)", 5, 200, int(demo_values.get("venc_cm_s", 40)), step=1)
+    field_inhomogeneity = st.slider("Field inhomogeneity", 0.0, 1.0, float(demo_values.get("field_inhomogeneity", 0.2)), step=0.01)
 
     st.header("Patient Monitoring")
     defaults = PATIENTS[patient_name]
-    heart_rate = st.slider("Heart rate (bpm)", 40, 180, int(defaults["heart_rate"]))
-    resp_rate = st.slider("Respiration rate (breaths/min)", 6, 40, int(defaults["resp_rate"]))
-    spo2 = st.slider("SpO2 (%)", 80, 100, int(defaults["spo2"]))
-    motion_level = st.slider("Motion level", 0.0, 1.0, float(defaults["motion"]), step=0.01)
-    flow_cm_s = st.slider("Flow velocity (cm/s)", 0, 150, int(defaults["flow"]))
+    heart_rate = st.slider("Heart rate (bpm)", 40, 180, int(demo_values.get("heart_rate", defaults["heart_rate"])))
+    resp_rate = st.slider("Respiration rate (breaths/min)", 6, 40, int(demo_values.get("resp_rate", defaults["resp_rate"])))
+    spo2 = st.slider("SpO2 (%)", 80, 100, int(demo_values.get("spo2", defaults["spo2"])))
+    motion_level = st.slider("Motion level", 0.0, 1.0, float(demo_values.get("motion_level", defaults["motion"])), step=0.01)
+    flow_cm_s = st.slider("Flow velocity (cm/s)", 0, 150, int(demo_values.get("flow_cm_s", defaults["flow"])))
 
     st.header("Simulation Options")
     duration_s = st.slider("Monitoring duration (s)", 20, 180, 60, step=10)
     sample_rate_hz = st.slider("Sampling rate (Hz)", 1, 20, 5, step=1)
-    fmri_mode = st.checkbox("Enable fMRI task mode", value=False)
+    fmri_mode = st.checkbox("Enable fMRI task mode", value=bool(demo_values.get("fmri_mode", False)))
     show_kspace = st.checkbox("Show k-space", value=True)
 
 
@@ -368,12 +408,14 @@ scores = artifact_scores(
 # -----------------------------
 # Top metrics
 # -----------------------------
-metric_cols = st.columns(5)
+image_quality_score = max(0, min(100, 100 - 0.35 * sum(scores.values()) + 0.8 * snr - 0.02 * scan_time_s))
+metric_cols = st.columns(6)
 metric_cols[0].metric("Estimated Signal", f"{signal_value:.3f}")
 metric_cols[1].metric("Estimated SNR", f"{snr:.1f}")
 metric_cols[2].metric("Scan Time", f"{scan_time_s:.1f} s")
 metric_cols[3].metric("Ernst Angle", f"{optimal_flip:.1f}°")
 metric_cols[4].metric("Dominant Artifact", max(scores, key=scores.get))
+metric_cols[5].metric("Image Quality Score", f"{image_quality_score:.0f}/100")
 
 
 # -----------------------------
@@ -552,6 +594,17 @@ with tab3:
 **Flow / VENC:** {flow_cm_s} cm/s / {venc_cm_s} cm/s
             """
         )
+
+        st.write(f"### Suggested talking point for this scenario: {demo_name}")
+        
+        scenario_message = {
+            "Custom": "Use this mode to build your own scan and explain how each variable changes MRI behavior.",
+            "T1 vs T2 Weighting": "Use this scenario to show how TR and TE control tissue contrast and why parameter selection matters.",
+            "Motion Artifact": "Use this scenario to demonstrate how patient motion and EPI sensitivity degrade image quality and monitoring stability.",
+            "Aliasing from Small FOV": "Use this scenario to show how insufficient FOV causes wrap-around artifact and why acquisition planning matters.",
+            "fMRI Activation": "Use this scenario to connect physiology, task timing, and BOLD-like signal changes in a dynamic acquisition.",
+        }[demo_name]
+        st.info(scenario_message)
 
         tradeoffs = []
         tradeoffs.append("Higher bandwidth lowers chemical shift artifact but also reduces SNR." if bandwidth_khz > 50 else "Lower bandwidth improves SNR but can worsen chemical shift artifact.")
